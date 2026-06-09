@@ -128,13 +128,46 @@ def load_risk_model():
         sys.exit(1)
 
 
+def calculate_market_timing(prices: pd.DataFrame, window: int = 20):
+    """
+    计算市场择时信号
+
+    使用科创50等权指数的MA趋势判断市场状态
+
+    Args:
+        prices: 价格数据
+        window: 移动平均窗口
+
+    Returns:
+        DataFrame with columns: date, market_signal (1=牛市, 0=熊市)
+    """
+    # 计算等权指数
+    index_daily = prices.groupby('trade_date')['close'].mean()
+
+    # 计算移动平均
+    index_ma = index_daily.rolling(window=window).mean()
+
+    # 生成信号: 价格 > MA20 = 牛市
+    market_signal = (index_daily > index_ma).astype(int)
+
+    return pd.DataFrame({
+        'date': market_signal.index,
+        'market_signal': market_signal.values,
+        'index_close': index_daily.values,
+        'index_ma': index_ma.values
+    })
+
+
 def optimize_portfolios(
     alpha_series: pd.DataFrame,
     factor_exposures: pd.DataFrame,
     factor_cov: pd.DataFrame,
     specific_risk: pd.DataFrame,
     risk_aversion: float,
-    max_weight: float
+    max_weight: float,
+    prices: pd.DataFrame = None,
+    rebalance_days: int = 5,
+    market_timing: bool = False
 ):
     """优化组合权重"""
     print("\n" + "="*60)
@@ -145,15 +178,31 @@ def optimize_portfolios(
         print("错误: cvxpy未安装")
         sys.exit(1)
 
-    optimizer = PortfolioOptimizer(
-        risk_aversion=risk_aversion,
-        max_weight=max_weight,
-        max_turnover=1.0  # 回测时不限制换手
-    )
+    # 计算市场择时信号
+    market_signals = None
+    if market_timing and prices is not None:
+        print("  ✓ 启用市场择时模块")
+        market_signals = calculate_market_timing(prices, window=20)
+        bull_days = (market_signals['market_signal'] == 1).sum()
+        bear_days = (market_signals['market_signal'] == 0).sum()
+        print(f"    牛市天数: {bull_days}, 熊市天数: {bear_days}")
 
     all_weights = []
+    all_dates = sorted(alpha_series['date'].unique())
 
-    for date in alpha_series['date'].unique():
+    print(f"  ✓ 调仓频率: 每{rebalance_days}天")
+    print(f"  ✓ 预期调仓次数: ~{len(all_dates) // rebalance_days}")
+
+    for i, date in enumerate(all_dates):
+        # 降低调仓频率：只在指定的交易日调仓
+        if i % rebalance_days != 0:
+            # 复用上一期权重
+            if all_weights:
+                last_weights = all_weights[-1].copy()
+                last_weights['date'] = date
+                all_weights.append(last_weights)
+            continue
+
         daily_alpha = alpha_series[alpha_series['date'] == date].copy()
         stock_codes = daily_alpha['ts_code'].tolist()
 
@@ -163,6 +212,21 @@ def optimize_portfolios(
         specific_risk_dict = dict(zip(specific_risk['ts_code'], specific_risk['specific_variance']))
         D = np.diag([specific_risk_dict.get(code, 0.0001) for code in stock_codes])
         covariance = B @ F @ B.T + D
+
+        # 动态调整风险厌恶系数（市场择时）
+        current_risk_aversion = risk_aversion
+        if market_timing and market_signals is not None:
+            market_state = market_signals[market_signals['date'] == date]
+            if len(market_state) > 0:
+                is_bull = market_state['market_signal'].iloc[0] == 1
+                # 牛市降低风险厌恶，熊市提高
+                current_risk_aversion = risk_aversion * 0.6 if is_bull else risk_aversion * 1.5
+
+        optimizer = PortfolioOptimizer(
+            risk_aversion=current_risk_aversion,
+            max_weight=max_weight,
+            max_turnover=1.0
+        )
 
         # 优化
         result = optimizer.optimize(
@@ -181,6 +245,7 @@ def optimize_portfolios(
     weights_series = pd.concat(all_weights, ignore_index=True)
 
     print(f"  ✓ 优化完成: {len(weights_series['date'].unique())} 天")
+    print(f"  ✓ 实际调仓次数: {len(all_dates) // rebalance_days}")
 
     return weights_series
 
@@ -303,6 +368,10 @@ def main():
                        help='风险厌恶系数')
     parser.add_argument('--max_weight', type=float, default=0.05,
                        help='最大个股权重')
+    parser.add_argument('--rebalance_days', type=int, default=5,
+                       help='调仓频率（天）')
+    parser.add_argument('--market_timing', action='store_true',
+                       help='启用市场择时')
     parser.add_argument('--output', type=str, default='results/backtest',
                        help='输出目录')
 
@@ -315,6 +384,8 @@ def main():
     print(f"初始资金: {args.capital:,.0f}")
     print(f"风险厌恶: {args.risk_aversion}")
     print(f"最大权重: {args.max_weight}")
+    print(f"调仓频率: 每{args.rebalance_days}天")
+    print(f"市场择时: {'启用' if args.market_timing else '禁用'}")
     print("="*60)
 
     # 1. 加载数据
@@ -329,7 +400,10 @@ def main():
     # 4. 优化组合
     weights_series = optimize_portfolios(
         alpha_series, factor_exposures, factor_cov, specific_risk,
-        args.risk_aversion, args.max_weight
+        args.risk_aversion, args.max_weight,
+        prices=prices,
+        rebalance_days=args.rebalance_days,
+        market_timing=args.market_timing
     )
 
     # 5. 运行回测
