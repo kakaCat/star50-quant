@@ -167,7 +167,8 @@ def optimize_portfolios(
     max_weight: float,
     prices: pd.DataFrame = None,
     rebalance_days: int = 5,
-    market_timing: bool = False
+    market_timing: bool = False,
+    alpha_weighted: bool = False
 ):
     """优化组合权重"""
     print("\n" + "="*60)
@@ -225,7 +226,8 @@ def optimize_portfolios(
         optimizer = PortfolioOptimizer(
             risk_aversion=current_risk_aversion,
             max_weight=max_weight,
-            max_turnover=1.0
+            max_turnover=1.0,
+            alpha_weighted=alpha_weighted
         )
 
         # 优化
@@ -372,6 +374,8 @@ def main():
                        help='调仓频率（天）')
     parser.add_argument('--market_timing', action='store_true',
                        help='启用市场择时')
+    parser.add_argument('--alpha_weighted', action='store_true',
+                       help='启用Alpha加权配置')
     parser.add_argument('--output', type=str, default='results/backtest',
                        help='输出目录')
 
@@ -386,6 +390,7 @@ def main():
     print(f"最大权重: {args.max_weight}")
     print(f"调仓频率: 每{args.rebalance_days}天")
     print(f"市场择时: {'启用' if args.market_timing else '禁用'}")
+    print(f"Alpha加权: {'启用' if args.alpha_weighted else '禁用'}")
     print("="*60)
 
     # 1. 加载数据
@@ -403,7 +408,8 @@ def main():
         args.risk_aversion, args.max_weight,
         prices=prices,
         rebalance_days=args.rebalance_days,
-        market_timing=args.market_timing
+        market_timing=args.market_timing,
+        alpha_weighted=args.alpha_weighted
     )
 
     # 5. 运行回测

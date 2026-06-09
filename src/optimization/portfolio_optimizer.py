@@ -33,7 +33,8 @@ class PortfolioOptimizer:
         risk_aversion: float = 1.0,
         max_weight: float = 0.05,
         max_turnover: float = 0.3,
-        min_weight: float = 0.0
+        min_weight: float = 0.0,
+        alpha_weighted: bool = False
     ):
         """
         初始化优化器
@@ -43,11 +44,51 @@ class PortfolioOptimizer:
             max_weight: 单个股票最大权重
             max_turnover: 最大换手率（相对于上期权重）
             min_weight: 单个股票最小权重（通常为0）
+            alpha_weighted: 是否使用Alpha加权配置
         """
         self.risk_aversion = risk_aversion
         self.max_weight = max_weight
         self.max_turnover = max_turnover
         self.min_weight = min_weight
+        self.alpha_weighted = alpha_weighted
+
+    def _get_alpha_weighted_bounds(
+        self,
+        alpha: np.ndarray,
+        n_holdings: int = 20
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        根据Alpha值计算动态权重上下限
+
+        Args:
+            alpha: Alpha预测值
+            n_holdings: 持仓数量
+
+        Returns:
+            (lower_bounds, upper_bounds)
+        """
+        # 选择Top N个Alpha
+        top_n_indices = np.argsort(alpha)[-n_holdings:]
+
+        # 初始化上下限
+        lower_bounds = np.zeros(len(alpha))
+        upper_bounds = np.zeros(len(alpha))
+
+        # 只对Top N设置权重
+        top_alphas = alpha[top_n_indices]
+
+        # 归一化Alpha到权重
+        # 使用softmax确保正值
+        alpha_normalized = np.exp(top_alphas - top_alphas.max())
+        alpha_weights = alpha_normalized / alpha_normalized.sum()
+
+        # 设置上限：基础权重的1.5倍，但不超过max_weight
+        for i, idx in enumerate(top_n_indices):
+            base_weight = alpha_weights[i]
+            upper_bounds[idx] = min(base_weight * 1.5, self.max_weight)
+            lower_bounds[idx] = max(base_weight * 0.5, 0.01)  # 至少1%
+
+        return lower_bounds, upper_bounds
 
     def optimize(
         self,
@@ -97,8 +138,16 @@ class PortfolioOptimizer:
         constraints.append(cp.sum(w) == 1)
 
         # 2. 权重范围约束
-        constraints.append(w >= self.min_weight)
-        constraints.append(w <= self.max_weight)
+        if self.alpha_weighted:
+            # Alpha加权：动态上下限
+            lower_bounds, upper_bounds = self._get_alpha_weighted_bounds(alpha)
+            for i in range(n_stocks):
+                constraints.append(w[i] >= lower_bounds[i])
+                constraints.append(w[i] <= upper_bounds[i])
+        else:
+            # 传统方式：固定上限
+            constraints.append(w >= self.min_weight)
+            constraints.append(w <= self.max_weight)
 
         # 3. 可投资股票约束
         if stock_universe is not None:
