@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.utils import load_config, load_env, setup_logger
 from src.data.database import DatabaseManager
 from src.data.collectors import StockDataCollector, IndexDataCollector
+from src.data.collectors.multi_source import MultiSourceCollector
 import pandas as pd
 
 
@@ -45,7 +46,7 @@ def save_to_database(df: pd.DataFrame, table_name: str, db_manager: DatabaseMana
 
 
 def collect_stock_data(args, logger):
-    """采集股票数据"""
+    """采集股票数据 - 使用多数据源管理器"""
     logger.info("=== 开始采集股票数据 ===")
 
     # 加载配置
@@ -53,12 +54,16 @@ def collect_stock_data(args, logger):
     data_config = load_config("configs/data_config.yaml")
     db_config = load_config("configs/db_config.yaml")
 
-    # 初始化采集器
-    stock_collector = StockDataCollector()
+    # 使用多数据源采集器
+    multi_collector = MultiSourceCollector()
 
     # 获取科创50成分股
     logger.info("获取科创50成分股列表")
-    ts_codes = stock_collector.get_star50_components()
+    try:
+        ts_codes = multi_collector.get_star50_components()
+    except Exception as e:
+        logger.error(f"获取成分股失败: {e}")
+        return
 
     if not ts_codes:
         logger.error("获取成分股失败")
@@ -70,12 +75,15 @@ def collect_stock_data(args, logger):
     start_date = args.start_date or data_config['date_range']['start']
     end_date = args.end_date or data_config['date_range']['end']
 
-    # 采集数据
+    # 采集数据（使用多数据源自动故障转移）
     logger.info(f"采集日期范围: {start_date} 至 {end_date}")
-    df = stock_collector.collect_daily_data(ts_codes, start_date, end_date)
+    df = multi_collector.collect_daily_data(ts_codes, start_date, end_date)
 
     if df.empty:
         logger.warning("未采集到任何股票数据")
+        # 输出统计信息
+        stats = multi_collector.get_stats()
+        logger.info(f"数据源统计: {stats}")
         return
 
     # 保存到数据库
@@ -85,6 +93,10 @@ def collect_stock_data(args, logger):
 
     try:
         save_to_database(df, 'stock_daily', db_manager, logger)
+
+        # 输出统计信息
+        stats = multi_collector.get_stats()
+        logger.info(f"数据源统计: {stats}")
         logger.info("=== 股票数据采集完成 ===")
     finally:
         db_manager.disconnect()
