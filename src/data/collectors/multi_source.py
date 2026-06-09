@@ -70,12 +70,14 @@ class MultiSourceCollector:
     """多数据源采集器 - 自动故障转移"""
 
     def __init__(self):
-        self.data_source = 'akshare'  # 默认使用 akshare
+        self.data_source = 'tencent'  # 默认使用腾讯财经
         self.circuit_breakers: Dict[str, CircuitBreaker] = {
+            'tencent': CircuitBreaker(failure_threshold=3, timeout_seconds=60),
             'akshare': CircuitBreaker(failure_threshold=3, timeout_seconds=60),
             'baostock': CircuitBreaker(failure_threshold=3, timeout_seconds=60),
         }
         self.stats = {
+            'tencent': {'success': 0, 'failure': 0},
             'akshare': {'success': 0, 'failure': 0},
             'baostock': {'success': 0, 'failure': 0},
         }
@@ -188,6 +190,21 @@ class MultiSourceCollector:
 
         for idx, ts_code in enumerate(ts_codes, 1):
             try:
+                # 尝试腾讯财经（优先）
+                if self.circuit_breakers['tencent'].can_attempt():
+                    try:
+                        df = self._collect_from_tencent(ts_code, start_date, end_date)
+                        if df is not None and not df.empty:
+                            self.circuit_breakers['tencent'].record_success()
+                            self.stats['tencent']['success'] += 1
+                            all_data.append(df)
+                            logger.info(f"[{idx}/{total}] {ts_code}: tencent 采集 {len(df)} 条记录")
+                            continue
+                    except Exception as e:
+                        logger.warning(f"[{idx}/{total}] {ts_code}: tencent 失败 - {e}")
+                        self.circuit_breakers['tencent'].record_failure()
+                        self.stats['tencent']['failure'] += 1
+
                 # 尝试 akshare
                 if self.circuit_breakers['akshare'].can_attempt():
                     try:
@@ -231,6 +248,51 @@ class MultiSourceCollector:
         else:
             logger.warning("未采集到任何数据")
             return pd.DataFrame()
+
+    def _collect_from_tencent(
+        self,
+        ts_code: str,
+        start_date: str,
+        end_date: str
+    ) -> Optional[pd.DataFrame]:
+        """从腾讯财经采集单只股票数据"""
+        import akshare as ak
+
+        try:
+            # 使用akshare的腾讯财经接口
+            # 转换代码格式：688009.SH -> sh688009
+            exchange = ts_code.split('.')[1].lower()  # SH -> sh
+            symbol = ts_code.split('.')[0]
+            tencent_code = f"{exchange}{symbol}"
+
+            # 调用腾讯财经接口
+            df = ak.stock_zh_a_hist_tx(
+                symbol=tencent_code,
+                start_date=start_date.replace('-', ''),
+                end_date=end_date.replace('-', '')
+            )
+
+            if df is None or df.empty:
+                return None
+
+            # 转换为标准格式（腾讯财经返回英文列名）
+            df['ts_code'] = ts_code
+            df['trade_date'] = pd.to_datetime(df['date']).dt.date
+            df['open'] = pd.to_numeric(df['open'], errors='coerce').astype(float)
+            df['high'] = pd.to_numeric(df['high'], errors='coerce').astype(float)
+            df['low'] = pd.to_numeric(df['low'], errors='coerce').astype(float)
+            df['close'] = pd.to_numeric(df['close'], errors='coerce').astype(float)
+            # 腾讯财经的volume在amount字段中
+            df['volume'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0).astype(float)
+            df['amount'] = df['volume']  # 使用相同的值
+
+            # 只保留需要的列
+            result = df[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'volume', 'amount']]
+            return result
+
+        except Exception as e:
+            logger.debug(f"腾讯财经采集失败: {e}")
+            return None
 
     def _collect_from_akshare(
         self,
@@ -323,15 +385,22 @@ class MultiSourceCollector:
 
             df = pd.DataFrame(data_list, columns=rs.fields)
 
+            # 处理空字符串和无效数据
+            df = df.replace('', None)
+            df = df.dropna(subset=['date', 'close'])
+
+            if df.empty:
+                return None
+
             # 转换为标准格式
             df['ts_code'] = ts_code
             df['trade_date'] = pd.to_datetime(df['date']).dt.date
-            df['open'] = df['open'].astype(float)
-            df['high'] = df['high'].astype(float)
-            df['low'] = df['low'].astype(float)
-            df['close'] = df['close'].astype(float)
-            df['volume'] = df['volume'].astype(float)
-            df['amount'] = df['amount'].astype(float)
+            df['open'] = pd.to_numeric(df['open'], errors='coerce').fillna(0).astype(float)
+            df['high'] = pd.to_numeric(df['high'], errors='coerce').fillna(0).astype(float)
+            df['low'] = pd.to_numeric(df['low'], errors='coerce').fillna(0).astype(float)
+            df['close'] = pd.to_numeric(df['close'], errors='coerce').astype(float)
+            df['volume'] = pd.to_numeric(df['volume'], errors='coerce').fillna(0).astype(float)
+            df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0).astype(float)
 
             # 只保留需要的列
             result = df[['ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'volume', 'amount']]
