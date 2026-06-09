@@ -1,0 +1,21 @@
+# 数据库配置文件
+# 敏感信息通过环境变量引用，不直接写入
+postgres:
+  host: ${DB_HOST}
+  port: ${DB_PORT}
+  database: ${DB_NAME}
+  user: ${DB_USER}
+  password: ${DB_PASSWORD}
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false  # SQL日志输出
+
+# 表名配置
+tables:
+  stock_daily: "stock_daily"
+  stock_minute: "stock_minute"
+  fundamentals: "fundamentals"
+  factors: "factors"
+  index_components: "index_components"
