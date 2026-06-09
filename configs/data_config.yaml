@@ -1,0 +1,22 @@
+# 数据配置文件
+stock_pool:
+  index: "科创50"
+  include_delisted: true  # 包含历史调出股票，避免幸存者偏差
+
+data_sources:
+  price_data: "akshare"  # 价格数据源：akshare
+  fundamental: "wind"    # 基本面数据源
+  alternative: "custom"  # 另类数据源（研发、专利等）
+
+frequency:
+  daily: true
+  minute: false  # 可选：分钟频数据
+
+date_range:
+  start: "2020-01-01"
+  end: "2024-12-31"
+
+# 数据更新配置
+update:
+  mode: "incremental"  # incremental或full
+  schedule: "daily"    # daily, weekly, monthly
