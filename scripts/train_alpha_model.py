@@ -20,9 +20,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from src.models.data_loader import FactorDataLoader
 from src.models.lgbm_model import LightGBMAlphaModel
-from src.models.lstm_model import LSTMAlphaTrainer, StockSequenceDataset
-import torch
-from torch.utils.data import DataLoader
+
+# 可选导入PyTorch相关模块
+try:
+    from src.models.lstm_model import LSTMAlphaTrainer, StockSequenceDataset
+    import torch
+    from torch.utils.data import DataLoader
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 
 def train_lgbm(
@@ -219,6 +225,10 @@ def main():
             forward_days=args.forward
         )
     elif args.model == 'lstm':
+        if not TORCH_AVAILABLE:
+            print("错误: PyTorch未安装，无法训练LSTM模型")
+            print("请先安装: pip install torch")
+            sys.exit(1)
         train_lstm(
             start_date=args.start,
             end_date=args.end,
