@@ -1,0 +1,149 @@
+# 特征工程配置
+feature_engineering:
+  # 原始因子列表（30个）
+  original_factors:
+    momentum:
+      - macd
+      - macd_signal
+      - macd_histogram
+      - rsi6
+      - rsi12
+      - rsi24
+      - roc_5
+      - roc_10
+      - roc_20
+      - momentum_5
+      - momentum_10
+      - momentum_20
+
+    volume:
+      - obv
+      - mfi14
+      - vwap
+      - volume_ma5
+      - volume_ma10
+      - volume_ma20
+      - volume_ratio
+
+    trend:
+      - ma5
+      - ma10
+      - ma20
+      - ma60
+      - ema5
+      - ema10
+      - ema20
+      - boll_upper
+      - boll_middle
+      - boll_lower
+      - atr14
+
+  # Top因子（用于衍生特征）
+  top_factors:
+    - volume_ma20
+    - atr14
+    - obv
+    - ma60
+    - macd_signal
+    - boll_lower
+    - macd_histogram
+    - volume_ma10
+    - macd
+    - volume_ma5
+    - rsi12
+    - momentum_10
+    - roc_10
+    - mfi14
+    - ma20
+
+  # 交叉特征配置
+  cross_features:
+    momentum_volume:
+      - [rsi6, volume_ratio]
+      - [rsi12, volume_ratio]
+      - [rsi24, volume_ratio]
+      - [momentum_5, obv]
+      - [momentum_10, obv]
+      - [momentum_20, obv]
+      - [roc_5, mfi14]
+      - [roc_10, mfi14]
+      - [roc_20, mfi14]
+
+    macd_volume:
+      - [macd, volume_ma5]
+      - [macd, volume_ma10]
+      - [macd, volume_ma20]
+      - [macd_signal, obv]
+      - [macd_histogram, volume_ratio]
+
+    momentum_ratio:
+      - [rsi6, rsi24, div]
+      - [momentum_5, momentum_20, div]
+      - [roc_5, roc_20, div]
+
+    trend_momentum:
+      - [ma5, momentum_5, slope_mult]
+      - [ma10, momentum_10, slope_mult]
+      - [ma20, momentum_20, slope_mult]
+      - [ma20, rsi12, slope_mult]
+
+    volatility_adjusted:
+      - [macd, atr14, div]
+      - [momentum_5, atr14, div]
+      - [rsi6, atr14, div]
+      - [obv, atr14, div]
+      - [volume_ratio, atr14, div]
+
+  # 时序衍生配置
+  temporal_features:
+    momentum_periods: [5, 10, 20]
+    volatility_periods: [20]
+    factors: []  # 使用top_factors
+
+  # 非线性变换配置
+  nonlinear_transforms:
+    log_factors:
+      - volume_ma20
+      - atr14
+      - obv
+      - volume_ma10
+      - volume_ma5
+
+    rank_factors:
+      - rsi6
+      - rsi12
+      - macd
+      - momentum_10
+      - roc_10
+
+  # 截面统计配置
+  cross_sectional:
+    quantile_factors:
+      - volume_ma20
+      - atr14
+      - rsi6
+      - macd
+      - obv
+
+    zscore_factors: []  # 使用top_factors前10
+
+  # Alpha因子配置
+  alpha_factors:
+    enabled:
+      - alpha_001
+      - alpha_006
+      - alpha_053
+      - alpha_054
+      - alpha_101
+      - alpha_custom_price_volume_divergence
+      - alpha_custom_ma_acceleration
+      - alpha_custom_volume_surge
+      - alpha_custom_volatility_ratio
+      - alpha_custom_trend_strength
+
+# 特征验证
+validation:
+  check_nan: true
+  check_inf: true
+  max_missing_ratio: 0.1
+  correlation_threshold: 0.95  # 相关性>0.95视为重复
