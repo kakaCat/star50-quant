@@ -67,7 +67,7 @@ def generate_mock_data(n_stocks=50, n_days=500):
     for stock in stocks:
         stock_data = df[df['ts_code'] == stock].copy()
         stock_data = stock_data.sort_values('factor_date')
-        stock_data['forward_return'] = stock_data['close'].pct_change(5).shift(-5)
+        stock_data['forward_return'] = (stock_data['close'].shift(-5) - stock_data['close']) / stock_data['close']
 
         for _, row in stock_data.iterrows():
             labels_data.append({

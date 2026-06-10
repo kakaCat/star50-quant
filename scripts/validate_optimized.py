@@ -99,7 +99,7 @@ def prepare_dataset(df, forward_days=5):
     labels_data = []
     for ts_code, group in df.groupby('ts_code'):
         group = group.sort_values('trade_date').copy()
-        group['forward_return'] = group['close'].pct_change(forward_days).shift(-forward_days)
+        group['forward_return'] = (group['close'].shift(-forward_days) - group['close']) / group['close']
         for _, row in group.iterrows():
             labels_data.append({
                 'ts_code': row['ts_code'],
