@@ -230,6 +230,7 @@ class PortfolioOptimizer:
             'expected_return': float(weights @ alpha),
             'expected_risk': 0.0,
             'expected_volatility': 0.0,
+            'tracking_error': 0.0,
             'turnover': 0.0,
             'objective': 0.0,
             'status': 'fallback',
@@ -288,10 +289,14 @@ class PortfolioOptimizer:
         problem = cp.Problem(objective, constraints)
 
         try:
-            problem.solve(solver=cp.OSQP, verbose=False)
+            # 先尝试OSQP
+            try:
+                problem.solve(solver=cp.OSQP, verbose=False, eps_abs=1e-4, eps_rel=1e-4)
+            except Exception:
+                # OSQP失败，尝试SCS
+                problem.solve(solver=cp.SCS, verbose=False)
 
             if problem.status not in ['optimal', 'optimal_inaccurate']:
-                print(f"Warning: 优化未收敛，状态={problem.status}")
                 return self._fallback_solution(n_stocks, alpha, previous_weights)
 
             optimal_weights = w.value
