@@ -35,7 +35,9 @@ def train_lgbm(
     start_date: str = '2020-01-01',
     end_date: str = '2024-12-31',
     forward_days: int = 5,
-    save_path: str = 'models/lgbm_alpha.txt'
+    save_path: str = 'models/lgbm_alpha.txt',
+    enable_feature_engineering: bool = False,
+    feature_config_path: str = '../configs/feature_config.yaml'
 ):
     """
     训练LightGBM模型
@@ -45,6 +47,8 @@ def train_lgbm(
         end_date: 结束日期
         forward_days: 预测未来N天
         save_path: 模型保存路径
+        enable_feature_engineering: 是否启用特征工程
+        feature_config_path: 特征工程配置文件路径
     """
     print("="*60)
     print("训练LightGBM Alpha模型")
@@ -55,7 +59,9 @@ def train_lgbm(
         features, labels = loader.build_dataset(
             start_date=start_date,
             end_date=end_date,
-            forward_days=forward_days
+            forward_days=forward_days,
+            enable_feature_engineering=enable_feature_engineering,
+            feature_config_path=feature_config_path
         )
 
     print(f"\nDataset shape: {features.shape}")
@@ -120,7 +126,9 @@ def train_lstm(
     end_date: str = '2024-12-31',
     forward_days: int = 5,
     lookback_days: int = 20,
-    save_path: str = 'models/lstm_alpha.pth'
+    save_path: str = 'models/lstm_alpha.pth',
+    enable_feature_engineering: bool = False,
+    feature_config_path: str = '../configs/feature_config.yaml'
 ):
     """
     训练LSTM模型
@@ -131,6 +139,8 @@ def train_lstm(
         forward_days: 预测未来N天
         lookback_days: 回看天数
         save_path: 模型保存路径
+        enable_feature_engineering: 是否启用特征工程
+        feature_config_path: 特征工程配置文件路径
     """
     print("="*60)
     print("训练LSTM Alpha模型")
@@ -142,7 +152,9 @@ def train_lstm(
             start_date=start_date,
             end_date=end_date,
             forward_days=forward_days,
-            lookback_days=lookback_days
+            lookback_days=lookback_days,
+            enable_feature_engineering=enable_feature_engineering,
+            feature_config_path=feature_config_path
         )
 
     print(f"\nDataset shape: {features.shape}")
@@ -215,6 +227,11 @@ def main():
     parser.add_argument('--end', type=str, default='2024-12-31', help='结束日期')
     parser.add_argument('--forward', type=int, default=5, help='预测未来N天')
     parser.add_argument('--lookback', type=int, default=20, help='LSTM回看天数')
+    parser.add_argument('--enable-features', action='store_true',
+                       help='启用特征工程（30→160特征）')
+    parser.add_argument('--feature-config', type=str,
+                       default='../configs/feature_config.yaml',
+                       help='特征工程配置文件路径')
 
     args = parser.parse_args()
 
@@ -222,7 +239,9 @@ def main():
         train_lgbm(
             start_date=args.start,
             end_date=args.end,
-            forward_days=args.forward
+            forward_days=args.forward,
+            enable_feature_engineering=args.enable_features,
+            feature_config_path=args.feature_config
         )
     elif args.model == 'lstm':
         if not TORCH_AVAILABLE:
@@ -233,7 +252,9 @@ def main():
             start_date=args.start,
             end_date=args.end,
             forward_days=args.forward,
-            lookback_days=args.lookback
+            lookback_days=args.lookback,
+            enable_feature_engineering=args.enable_features,
+            feature_config_path=args.feature_config
         )
 
 
