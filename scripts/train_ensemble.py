@@ -102,7 +102,7 @@ class EnsembleTrainer:
                     verbose_eval=False
                 )
 
-                # 保存模型
+                # 保存到内存
                 self.base_models[model_key] = {
                     'model': model,
                     'window': window,
@@ -112,6 +112,36 @@ class EnsembleTrainer:
                 print(f"  ✓ 训练完成")
 
         print(f"\n✓ 完成训练 {len(self.base_models)} 个基础模型")
+
+    def save_models(self, output_dir: str):
+        """
+        保存所有模型到磁盘
+
+        Args:
+            output_dir: 输出目录
+        """
+        print(f"\n保存模型到: {output_dir}")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 保存15个基础模型
+        for model_key, model_info in self.base_models.items():
+            model_path = os.path.join(output_dir, f'{model_key}.txt')
+            model_info['model'].model.save_model(model_path)
+            print(f"  ✓ {model_key}")
+
+        print(f"\n✓ 保存 {len(self.base_models)} 个模型")
+
+    def save_weights(self, output_dir: str, weights: np.ndarray):
+        """
+        保存IC权重
+
+        Args:
+            output_dir: 输出目录
+            weights: IC权重数组
+        """
+        weights_path = os.path.join(output_dir, 'ic_weights.npy')
+        np.save(weights_path, weights)
+        print(f"✓ IC权重已保存: {weights_path}")
 
     def get_base_predictions(
         self,
@@ -130,6 +160,23 @@ class EnsembleTrainer:
         Returns:
             (meta_features, meta_labels)
         """
+        # 先找所有窗口的交集样本
+        common_keys = None
+        for window in self.windows:
+            if mode == 'train':
+                labels, _ = split_labels[window]
+            else:
+                _, labels = split_labels[window]
+
+            keys = set(zip(labels['ts_code'], labels['factor_date']))
+            if common_keys is None:
+                common_keys = keys
+            else:
+                common_keys = common_keys.intersection(keys)
+
+        # 转为DataFrame用于过滤
+        common_df = pd.DataFrame(list(common_keys), columns=['ts_code', 'factor_date'])
+
         predictions = []
         all_labels = []
 
@@ -139,22 +186,28 @@ class EnsembleTrainer:
             else:
                 _, labels = split_labels[window]
 
+            # 只使用交集样本
+            labels_filtered = labels.merge(common_df, on=['ts_code', 'factor_date'], how='inner')
+
             # 对齐特征和标签
             merged = features.merge(
-                labels[['ts_code', 'factor_date', 'forward_return']],
+                labels_filtered[['ts_code', 'factor_date', 'forward_return']],
                 on=['ts_code', 'factor_date'],
                 how='inner'
-            )
+            ).sort_values(['ts_code', 'factor_date'])
+
+            # 分离特征和标签
+            pred_features = merged.drop('forward_return', axis=1)
 
             for config_name in self.model_configs.keys():
                 model_key = f'w{window}_{config_name}'
                 model_info = self.base_models[model_key]
 
                 # 预测
-                pred = model_info['model'].predict(merged)
+                pred = model_info['model'].predict(pred_features)
                 predictions.append(pred)
 
-            # 使用第一个窗口的标签（它们时间对齐）
+            # 收集标签
             if len(all_labels) == 0:
                 all_labels = merged['forward_return'].values
 
@@ -166,6 +219,7 @@ class EnsembleTrainer:
     def train_meta_learner(
         self,
         train_features: pd.DataFrame,
+        val_features: pd.DataFrame,
         split_labels: dict
     ):
         """
@@ -173,32 +227,52 @@ class EnsembleTrainer:
 
         Args:
             train_features: 训练特征
+            val_features: 验证特征
             split_labels: 标签字典
         """
         print("\n" + "="*80)
-        print("训练元学习器 (Ridge)")
+        print("训练元学习器 (IC加权)")
         print("="*80)
 
-        # 获取基础模型预测
-        print("收集基础模型预测...")
-        meta_features, meta_labels = self.get_base_predictions(
-            train_features, split_labels, mode='train'
+        # 1. 计算每个基础模型的验证集IC
+        print("计算基础模型IC...")
+        val_meta_features, val_meta_labels = self.get_base_predictions(
+            val_features, split_labels, mode='val'
         )
 
-        print(f"Meta特征: {meta_features.shape}")
-        print(f"Meta标签: {len(meta_labels)}")
-
-        # 训练Ridge
-        self.meta_learner = Ridge(alpha=1.0)
-        self.meta_learner.fit(meta_features, meta_labels)
-
-        print("✓ 元学习器训练完成")
-        print(f"\n元学习器权重:")
+        model_ics = []
         model_id = 0
         for window in self.windows:
             for config_name in self.model_configs.keys():
-                weight = self.meta_learner.coef_[model_id]
-                print(f"  w{window}_{config_name}: {weight:.4f}")
+                model_key = f'w{window}_{config_name}'
+                pred = val_meta_features[:, model_id]
+                ic = np.corrcoef(pred, val_meta_labels)[0, 1]
+                model_ics.append(ic)
+                print(f"  {model_key}: IC={ic:.4f}")
+                model_id += 1
+
+        # 2. IC加权融合
+        model_ics = np.array(model_ics)
+        # 只保留正IC的模型
+        positive_mask = model_ics > 0
+        if positive_mask.sum() == 0:
+            print("警告: 没有正IC模型，使用全部模型")
+            positive_mask = np.ones_like(model_ics, dtype=bool)
+
+        # 归一化权重
+        weights = np.zeros_like(model_ics)
+        weights[positive_mask] = model_ics[positive_mask] / model_ics[positive_mask].sum()
+
+        self.meta_learner = {'type': 'weighted', 'weights': weights}
+
+        print("\n✓ 元学习器训练完成 (IC加权)")
+        print(f"\n最终权重:")
+        model_id = 0
+        for window in self.windows:
+            for config_name in self.model_configs.keys():
+                weight = weights[model_id]
+                if weight > 0:
+                    print(f"  w{window}_{config_name}: {weight:.4f} (IC={model_ics[model_id]:.4f})")
                 model_id += 1
 
     def evaluate(
@@ -226,7 +300,10 @@ class EnsembleTrainer:
         )
 
         # 集成预测
-        ensemble_pred = self.meta_learner.predict(meta_features)
+        if self.meta_learner['type'] == 'weighted':
+            ensemble_pred = (meta_features * self.meta_learner['weights']).sum(axis=1)
+        else:
+            ensemble_pred = self.meta_learner.predict(meta_features)
 
         # 计算IC
         ic = np.corrcoef(ensemble_pred, true_labels)[0, 1]
@@ -243,18 +320,27 @@ class EnsembleTrainer:
 
         # 单模型对比
         print(f"\n单模型IC对比:")
+        best_ic = -1
+        best_model = ""
         for i, (window, config_name) in enumerate(
             [(w, c) for w in self.windows for c in self.model_configs.keys()]
         ):
             single_ic = np.corrcoef(meta_features[:, i], true_labels)[0, 1]
             print(f"  w{window}_{config_name}: {single_ic:.4f}")
+            if single_ic > best_ic:
+                best_ic = single_ic
+                best_model = f"w{window}_{config_name}"
+
+        print(f"\n最佳单模型: {best_model} (IC={best_ic:.4f})")
 
         return {
             'ic': ic,
             'ic_mean': ic_mean,
             'ic_std': ic_std,
             'ic_ir': ic_ir,
-            'ic_positive_ratio': ic_positive_ratio
+            'ic_positive_ratio': ic_positive_ratio,
+            'best_single_ic': best_ic,
+            'best_single_model': best_model
         }
 
 
@@ -284,10 +370,22 @@ def main():
     trainer.train_base_models(train_features, split_labels)
 
     # 训练元学习器
-    trainer.train_meta_learner(train_features, split_labels)
+    trainer.train_meta_learner(train_features, val_features, split_labels)
 
     # 评估
     results = trainer.evaluate(val_features, split_labels)
+
+    # 保存模型
+    print("\n" + "="*80)
+    print("保存模型")
+    print("="*80)
+
+    output_dir = 'models/phase2_ensemble'
+    trainer.save_models(output_dir)
+
+    # 保存IC权重
+    ic_weights = trainer.meta_learner['weights']
+    trainer.save_weights(output_dir, ic_weights)
 
     # 验收
     print("\n" + "="*80)
