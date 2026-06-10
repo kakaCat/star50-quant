@@ -43,7 +43,8 @@ def load_data(start_date: str, end_date: str):
     print("="*80)
     
     # 加载价格数据
-    prices_path = 'star50-quant/data/raw/star50_daily_hfq_data_6yrs.parquet'
+    base_dir = os.path.join(os.path.dirname(__file__), '..')
+    prices_path = os.path.join(base_dir, 'data/raw/star50_daily_hfq_data_6yrs.parquet')
     prices = pd.read_parquet(prices_path)
     
     # 过滤日期范围（扩展到start_date之前252天，用于协方差估计）
@@ -210,7 +211,9 @@ def main():
     print("="*80)
     
     # 加载配置
-    config = load_config('star50-quant/configs/phase3_config.yaml')
+    base_dir = os.path.join(os.path.dirname(__file__), '..')
+    config_path = os.path.join(base_dir, 'configs/phase3_config.yaml')
+    config = load_config(config_path)
     print(f"\n配置加载成功")
     print(f"  回测期间: {config['backtest']['start_date']} ~ {config['backtest']['end_date']}")
     print(f"  再平衡频率: {config['backtest']['rebalance_freq']}")
@@ -236,7 +239,7 @@ def main():
     print("2. 初始化组件")
     print("="*80)
     
-    predictor = EnsemblePredictor('star50-quant/' + config['ensemble']['model_dir'])
+    predictor = EnsemblePredictor(os.path.join(base_dir, config['ensemble']['model_dir']))
     print("  ✓ 集成模型预测器")
     
     risk_estimator = CovarianceEstimator(
@@ -390,7 +393,7 @@ def main():
     validate_phase3(metrics)
     
     # 保存结果
-    output_dir = 'star50-quant/' + config['output']['results_dir']
+    output_dir = os.path.join(base_dir, config['output']['results_dir'])
     os.makedirs(output_dir, exist_ok=True)
     
     backtest_results['portfolio'].to_csv(
