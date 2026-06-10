@@ -14,7 +14,9 @@ data/external/*
 *.pth
 *.pkl
 *.joblib
-models/
+models/*.pth
+models/*.pkl
+models/*.joblib
 
 # MLflow
 mlruns/*
