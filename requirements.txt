@@ -25,6 +25,9 @@ scipy>=1.10.0
 lightgbm>=4.0.0
 xgboost>=2.0.0
 
+# 超参数优化
+optuna>=3.0.0
+
 # 实验追踪
 mlflow>=2.8.0
 

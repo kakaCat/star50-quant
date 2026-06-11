@@ -1,0 +1,45 @@
+# MoE Model Configuration
+# ======================
+
+# 模型架构
+model:
+  hidden_dim: 64
+  dropout: 0.3
+
+# 训练参数
+training:
+  learning_rate: 0.005
+  weight_decay: 0.0001
+  epochs: 25
+  batch_size: 1024
+
+# 数据参数
+data:
+  forward_days: 5  # 预测未来5天收益率
+  beta_window: 60  # Beta计算使用60日滚动窗口
+  index_code: '000688.SH'  # 科创50指数
+
+# Walk-forward验证
+validation:
+  train_months: 24  # 24个月训练窗口
+  test_months: 1    # 1个月测试窗口
+
+# 特征分组（如果需要手动指定）
+features:
+  # 个股特征（量价技术指标）
+  stock_features:
+    - momentum_5d
+    - momentum_10d
+    - momentum_20d
+    - volatility_5d
+    - volatility_20d
+    - rsi_14
+    - macd
+    - volume_ratio
+
+  # 环境特征（市场整体特征）
+  regime_features:
+    - index_return_1d
+    - index_volatility_20d
+    - market_dispersion
+    - market_breadth
