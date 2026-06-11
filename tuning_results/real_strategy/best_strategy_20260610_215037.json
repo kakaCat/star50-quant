@@ -1,0 +1,9 @@
+{
+  "select_pct": 0.3,
+  "weight_method": "signal",
+  "ic": 0.5449653404686391,
+  "ir": 48.75568446289624,
+  "annual_return": 10.0,
+  "max_drawdown": -0.986865686363618,
+  "composite_score": 22.409805517522614
+}

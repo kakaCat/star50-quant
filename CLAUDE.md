@@ -33,10 +33,12 @@ Data Layer → Feature Engineering → Models (Alpha/Risk/RL) → Portfolio Opti
   - Configuration driven via `configs/feature_config.yaml`
 
 - **`src/models/`** - Machine learning models
-  - `data_loader.py`: Factor data loader with train/validation/test splitting and preprocessing (deextreme, standardization)
+  - `data_loader.py`: Factor data loader with train/validation/test splitting and preprocessing (deextreme, standardization, Beta剥离)
   - `lstm_model.py`: LSTM for time-series alpha prediction
   - `lgbm_model.py`: LightGBM baseline model
-  - `alpha/`: Alpha prediction models (LSTM, GRU, TFT)
+  - `alpha/`: Alpha prediction models
+    - `moe_model.py`: **Neural MoE** (Mixture of Experts) - 分离个股特征和环境特征，预测Beta剥离后的真实Alpha
+    - LSTM, GRU, TFT (待实现)
   - `risk/`: Deep risk models (autoencoders for non-linear risk factors)
   - `rl/`: Reinforcement learning agents for portfolio rebalancing
 
@@ -93,6 +95,17 @@ python scripts/validate_phase1.py
 # Train alpha prediction models
 python scripts/train_alpha_model.py --model lstm --epochs 100
 python scripts/train_alpha_model.py --model lgbm
+
+# Train Neural MoE model (Beta剥离 + 特征分离)
+python scripts/train_moe_model.py --start_date 2019-01-01 --end_date 2024-12-31
+python scripts/train_moe_model.py --hidden_dim 128 --epochs 30 --train_months 36
+
+# XGBoost Hyperparameter Tuning (NEW - 3 methods: random/grid/bayesian)
+python scripts/tune_xgb_model.py --method bayesian --n_iter 50  # Recommended: intelligent search
+python scripts/tune_xgb_model.py --method random --n_iter 100   # Fast exploration
+python scripts/tune_xgb_model.py --method grid                  # Exhaustive search
+# Target: IC>0.04, IR>=1.5, Annual Return>35%, Max Drawdown<=20%
+# See docs/xgboost-tuning-guide.md for details
 
 # Train risk model (autoencoder)
 python scripts/train_risk_model.py --model autoencoder --latent_dim 10

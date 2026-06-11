@@ -1,0 +1,23 @@
+{
+  "best_params": {
+    "colsample_bylevel": 0.6488152939379115,
+    "colsample_bytree": 0.798070764044508,
+    "gamma": 0.017194260557609198,
+    "learning_rate": 0.1827708763949686,
+    "max_depth": 4,
+    "min_child_weight": 6,
+    "num_boost_round": 96,
+    "reg_alpha": 1.0401360423556216,
+    "reg_lambda": 1.640130838029839,
+    "subsample": 0.6739417822102108,
+    "objective": "reg:squarederror",
+    "eval_metric": "rmse",
+    "booster": "gbtree",
+    "seed": 42,
+    "verbosity": 0
+  },
+  "best_score": 0.6433820244579808,
+  "search_method": "random_search",
+  "timestamp": "2026-06-10T21:28:47.941499",
+  "n_trials": 15
+}

@@ -1,0 +1,18 @@
+{
+  "best_params": {
+    "max_depth": 7,
+    "learning_rate": 0.08854190361128712,
+    "subsample": 0.9446251638870541,
+    "colsample_bytree": 0.9289917654434012,
+    "colsample_bylevel": 0.667206744005043,
+    "min_child_weight": 4,
+    "gamma": 0.0005369961598447512,
+    "reg_alpha": 2.963692846060678,
+    "reg_lambda": 2.7327441340281435,
+    "num_boost_round": 152
+  },
+  "best_score": 0.5470349739086205,
+  "search_method": "bayesian_optimization",
+  "timestamp": "2026-06-10T21:19:11.225314",
+  "n_trials": 50
+}
