@@ -1,0 +1,17 @@
+parameter,value,source
+n_estimators,180,focused_grid_search_best
+learning_rate,0.045,focused_grid_search_best
+num_leaves,62,focused_grid_search_best
+min_child_samples,120,focused_grid_search_best
+top_quantile,0.15,focused_grid_search_best
+subsample,0.708883630545785,focused_grid_search_best
+colsample_bytree,0.9130659181130071,focused_grid_search_best
+reg_alpha,0.0006006211003617198,focused_grid_search_best
+reg_lambda,0.4832835024703774,focused_grid_search_best
+train_window_days,756,experiment_setting
+fixed_predict_window_days,20,experiment_setting
+rolling_predict_window_days,5,experiment_setting
+rebalance_days,5,experiment_setting
+label_column,label_5d,experiment_setting
+top_quantile,0.15,experiment_setting
+transaction_cost,0.0,current_script_setting
