@@ -120,6 +120,12 @@ pytest tests/ -v --cov=src
 - 设计文档: `../docs/superpowers/specs/2026-06-09-star50-project-structure-design.md`
 - 实施计划: `../docs/superpowers/plans/2026-06-09-data-module-implementation.md`
 
+项目内实验记录：
+- LightGBM 固定窗口与滚动窗口调优总结: `LIGHTGBM_IMPLEMENTATION_SUMMARY.md`
+- LightGBM 详细实验记录: `docs/LIGHTGBM_WINDOW_OPTIMIZATION_REPORT.md`
+- LightGBM 调优结果: `tuning_results/lightgbm_window/`
+- LightGBM 最终结果 JSON: `results/lightgbm/lightgbm_results_20260612.json`
+
 ## 许可证
 
 MIT License

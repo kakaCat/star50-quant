@@ -1,0 +1,48 @@
+{
+  "model": "LightGBM",
+  "date": "2026-06-12",
+  "data": {
+    "stock_file": "star50_daily_hfq_data_6yrs.parquet",
+    "index_file": "star50_index_daily_6yrs.parquet",
+    "label": "label_5d"
+  },
+  "best_setup": {
+    "method": "focused_grid_search_params_reused_in_rolling_window",
+    "train_window_days": 756,
+    "predict_window_days": 5,
+    "rebalance_days": 5,
+    "top_quantile": 0.15,
+    "transaction_cost": 0.0
+  },
+  "best_params": {
+    "n_estimators": 180,
+    "learning_rate": 0.045,
+    "num_leaves": 62,
+    "min_child_samples": 120,
+    "subsample": 0.708883630545785,
+    "colsample_bytree": 0.9130659181130071,
+    "reg_alpha": 0.0006006211003617198,
+    "reg_lambda": 0.4832835024703774
+  },
+  "metrics": {
+    "cumulative_nav": 8.864977455311847,
+    "cumulative_return": 7.8649774553118466,
+    "annual_return": 1.3805616813409927,
+    "sharpe": 3.6114055976459483,
+    "max_drawdown": -0.2810025437450536,
+    "calmar": 4.912986419772558,
+    "benchmark_nav": 1.3036613439487466,
+    "cumulative_excess_return": 5.800061608377622,
+    "annual_excess_return": 1.1424177615773181,
+    "ic": 0.07210187135235384,
+    "rank_ic": 0.05500565069212342,
+    "icir": 0.41434991287922224,
+    "rank_icir": 0.3344705914790031,
+    "top_bottom_spread": 0.0114580617437757
+  },
+  "notes": [
+    "This is a stage-2 alpha model validation result, not a final production backtest.",
+    "Current scripts use transaction_cost = 0.0.",
+    "Industry, size, fundamental, R&D, patent and analyst expectation factors are not included yet."
+  ]
+}
